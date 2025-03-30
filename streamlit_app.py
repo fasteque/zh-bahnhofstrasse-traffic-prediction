@@ -24,6 +24,18 @@ st.set_page_config(page_title="Zurich Foot Traffic", layout="centered")
 st.markdown("<h2 style='text-align: center;'>🚶‍♀️ Zurich Bahnhofstrasse</h2>", unsafe_allow_html=True)
 st.markdown("<h2 style='text-align: center; '>Pedestrian Traffic Dashboard</h2>", unsafe_allow_html=True)
 
+st.markdown("""
+<div style='text-align: center;'>
+Welcome to the **Zurich Bahnhofstrasse Foot Traffic Dashboard**!  
+Upload your own CSV file to explore pedestrian patterns by hour, weekday, location, and more.  
+<br><br>
+📥 Get the official dataset here:  
+<a href='https://opendata.swiss/en/dataset/passantenfrequenzen-an-der-bahnhofstrasse-stundenwerte' target='_blank'>
+Zurich Bahnhofstrasse hourly pedestrian traffic (opendata.swiss)
+</a>
+</div>
+""", unsafe_allow_html=True)
+
 uploaded_file = st.file_uploader("Upload a CSV file", type=["csv"])
 
 if uploaded_file is not None:
@@ -100,6 +112,18 @@ if df is not None:
         st.pyplot(fig6)
 else:
     st.info("👈 Please upload a CSV file to view the dashboard.")
+
+st.sidebar.title("ℹ️ About")
+st.sidebar.info("""
+This dashboard displays foot traffic data collected on Zurich's Bahnhofstrasse.
+
+**Instructions:**
+1. Upload a CSV file.
+2. View interactive charts in each tab.
+3. (Coming soon) See predictive insights.
+
+Source: [opendata.swiss](https://opendata.swiss)
+""")
 
 st.markdown("---")
 st.markdown(
