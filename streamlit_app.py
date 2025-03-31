@@ -80,13 +80,15 @@ if prediction_mode == "Use uploaded CSV data" and df is None:
     st.warning("📂 Please upload a CSV file to use this prediction mode.")
 
 if df is not None and prediction_mode == "Use uploaded CSV data":
-    tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs([
+    tab1, tab2, tab3, tab4, tab5, tab6, tab7, tab8 = st.tabs([
         "⏰ Hourly Traffic",
         "📅 Weekday Traffic",
         "📆 Monthly Trends",
         "📍 Locations",
         "🗓️ Weekend vs Weekday",
-        "🕒 Hourly by Location"
+        "🕒 Hourly by Location",
+        "↔️ Directional Traffic",
+        "👥 Adults vs Children"
     ])
 
     with tab1:
@@ -144,6 +146,32 @@ if df is not None and prediction_mode == "Use uploaded CSV data":
         ax6.set_ylabel("Avg Pedestrian Count")
         ax6.legend(title="Location")
         st.pyplot(fig6)
+
+    with tab7:
+        st.subheader("↔️ Directional Traffic: Left-to-Right vs Right-to-Left")
+        ltr = df["ltr_pedestrians_count"].mean()
+        rtl = df["rtl_pedestrians_count"].mean()
+
+        fig7, ax7 = plt.subplots()
+        ax7.bar(["Left to Right", "Right to Left"], [ltr, rtl], color=["#1f77b4", "#ff7f0e"])
+        ax7.set_ylabel("Avg Pedestrian Count")
+        ax7.set_title("Average Traffic by Direction")
+        st.pyplot(fig7)
+
+    with tab8:
+        st.subheader("👥 Pedestrian Type: Adults vs Children")
+
+        adults = df["adult_ltr_pedestrians_count"] + df["adult_rtl_pedestrians_count"]
+        children = df["child_ltr_pedestrians_count"] + df["child_rtl_pedestrians_count"]
+
+        adult_avg = adults.mean()
+        child_avg = children.mean()
+
+        fig8, ax8 = plt.subplots()
+        ax8.bar(["Adults", "Children"], [adult_avg, child_avg], color=["#2ca02c", "#d62728"])
+        ax8.set_ylabel("Avg Pedestrian Count")
+        ax8.set_title("Average Daily Foot Traffic by Demographic")
+        st.pyplot(fig8)
 else:
     st.info("👈 Please upload a CSV file to view the dashboard.")
 
