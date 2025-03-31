@@ -1,6 +1,31 @@
 import streamlit as st
 import pandas as pd
 import matplotlib.pyplot as plt
+import joblib
+import numpy as np
+
+st.set_page_config(page_title="Zurich Foot Traffic", layout="centered")
+
+st.sidebar.title("ℹ️ About")
+st.sidebar.info("""
+This dashboard displays foot traffic data collected on Zurich's Bahnhofstrasse.
+
+**Instructions:**
+1. Upload a CSV file.
+2. View interactive charts in each tab.
+3. (Coming soon) See predictive insights.
+
+Source: [opendata.swiss](https://opendata.swiss)
+""")
+
+# Load trained model and feature columns
+@st.cache_resource
+def load_model():
+    model = joblib.load("model/xgb_model.pkl")
+    features = joblib.load("model/features.pkl")
+    return model, features
+
+model, model_features = load_model()
 
 def clean_data(df):
     df = df[df["collection_type"].notna()]
@@ -20,7 +45,6 @@ def load_data():
     df = clean_data(df)
     return df
 
-st.set_page_config(page_title="Zurich Foot Traffic", layout="centered")
 st.markdown("<h2 style='text-align: center;'>🚶‍♀️ Zurich Bahnhofstrasse</h2>", unsafe_allow_html=True)
 st.markdown("<h2 style='text-align: center; '>Pedestrian Traffic Dashboard</h2>", unsafe_allow_html=True)
 
@@ -45,7 +69,17 @@ if uploaded_file is not None:
 else:
     df = None
 
-if df is not None:
+st.markdown("---")
+st.header("🔮 Predict Pedestrian Count")
+
+st.markdown("Use the sliders and selectors below to simulate conditions and get a prediction.")
+
+prediction_mode = st.radio("Choose prediction mode:", ["Use uploaded CSV data", "Manual input (no CSV)"])
+
+if prediction_mode == "Use uploaded CSV data" and df is None:
+    st.warning("📂 Please upload a CSV file to use this prediction mode.")
+
+if df is not None and prediction_mode == "Use uploaded CSV data":
     tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs([
         "⏰ Hourly Traffic",
         "📅 Weekday Traffic",
@@ -113,17 +147,70 @@ if df is not None:
 else:
     st.info("👈 Please upload a CSV file to view the dashboard.")
 
-st.sidebar.title("ℹ️ About")
-st.sidebar.info("""
-This dashboard displays foot traffic data collected on Zurich's Bahnhofstrasse.
+if prediction_mode == "Manual input (no CSV)" or (prediction_mode == "Use uploaded CSV data" and df is not None):
+    with st.form("prediction_form"):
+        col1, col2 = st.columns(2)
 
-**Instructions:**
-1. Upload a CSV file.
-2. View interactive charts in each tab.
-3. (Coming soon) See predictive insights.
+        with col1:
+            hour = st.slider("Hour of day", 0, 23, 12)
+            weekday = st.selectbox("Weekday", ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"])
+            temperature = st.slider("Temperature (°C)", -10.0, 40.0, 15.0)
+        
+        with col2:
+            month = st.selectbox("Month", list(range(1, 13)))
+            is_weekend = st.radio("Weekend?", ["No", "Yes"])
+            location = st.selectbox("Location", sorted(df["location_name"].unique())) if df is not None else st.selectbox("Location", [])
+            weather = st.selectbox("Weather", sorted(df["weather_condition"].unique())) if df is not None else st.selectbox("Weather", [])
 
-Source: [opendata.swiss](https://opendata.swiss)
-""")
+        submitted = st.form_submit_button("Predict")
+
+        if submitted:
+            if prediction_mode == "Use uploaded CSV data":
+                prev_hour = df["pedestrians_count"].iloc[-1]
+                prev_hour_2 = df["pedestrians_count"].iloc[-2]
+                prev_day_hour = df["pedestrians_count"].iloc[-24]
+                prev_year_hour = df["pedestrians_count"].iloc[-8760]
+                rolling_3h = df["pedestrians_count"].rolling(3).mean().iloc[-1]
+                rolling_6h = df["pedestrians_count"].rolling(6).mean().iloc[-1]
+                rolling_24h = df["pedestrians_count"].rolling(24).mean().iloc[-1]
+            else:
+                prev_hour = st.slider("Previous hour count", 0, 10000, 1000)
+                prev_hour_2 = st.slider("2 hours ago", 0, 10000, 1000)
+                prev_day_hour = st.slider("Same hour yesterday", 0, 10000, 1000)
+                prev_year_hour = st.slider("Same hour last year", 0, 10000, 1000)
+                rolling_3h = st.slider("3h rolling avg", 0, 10000, 1000)
+                rolling_6h = st.slider("6h rolling avg", 0, 10000, 1000)
+                rolling_24h = st.slider("24h rolling avg", 0, 10000, 1000)
+
+            input_data = {
+                "hour": hour,
+                "weekday": ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].index(weekday),
+                "is_weekend": 1 if is_weekend == "Yes" else 0,
+                "month": month,
+                "temperature": temperature,
+                "prev_hour_count": prev_hour,
+                "prev_hour_count_2": prev_hour_2,
+                "prev_day_same_hour": prev_day_hour,
+                "prev_year_same_hour": prev_year_hour,
+                "rolling_3h": rolling_3h,
+                "rolling_6h": rolling_6h,
+                "rolling_24h": rolling_24h
+            }
+
+            # Add one-hot encoded values
+            for col in model_features:
+                if col.startswith("weather_condition_"):
+                    input_data[col] = 1 if col == f"weather_condition_{weather}" else 0
+                elif col.startswith("location_name_"):
+                    input_data[col] = 1 if col == f"location_name_{location}" else 0
+                elif col not in input_data:
+                    input_data[col] = 0  # default
+
+            input_df = pd.DataFrame([input_data])
+            log_pred = model.predict(input_df)[0]
+            prediction = int(np.expm1(log_pred))  # revert log1p
+
+            st.success(f"📈 Predicted pedestrian count: **{prediction}**")
 
 st.markdown("---")
 st.markdown(
